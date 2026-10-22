@@ -11,6 +11,7 @@ const getApiBaseUrl = () => {
 
 const axiosInstance = axios.create({
   baseURL: getApiBaseUrl(),
+  withCredentials: true,
 });
 
 // Hook that returns an axios instance with the Clerk Bearer token attached.
@@ -21,12 +22,22 @@ export const useAxiosWithAuth = () => {
   const authAxios = useMemo(() => {
     const instance = axios.create({
       baseURL: getApiBaseUrl(),
+      withCredentials: true,
     });
 
     instance.interceptors.request.use(async (config) => {
-      const token = await getToken();
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+      try {
+        const token = await getToken();
+        if (token) {
+          if (config.headers && typeof config.headers.set === "function") {
+            config.headers.set("Authorization", `Bearer ${token}`);
+          } else {
+            config.headers = config.headers || {};
+            config.headers.Authorization = `Bearer ${token}`;
+          }
+        }
+      } catch (err) {
+        console.error("Error retrieving Clerk token:", err);
       }
       return config;
     });

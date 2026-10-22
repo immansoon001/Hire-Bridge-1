@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { disconnectSocket, getSocket } from "../lib/socket";
 
 export const useSessionSocket = (sessionId, user) => {
@@ -6,16 +6,20 @@ export const useSessionSocket = (sessionId, user) => {
   const [participants, setParticipants] = useState([]);
   const [typingUsers, setTypingUsers] = useState([]);
 
+  const userId = user?.id;
+  const userName = user?.fullName || user?.username || user?.firstName || "Guest";
+  const userImage = user?.imageUrl || "";
+
   useEffect(() => {
-    if (!sessionId || !user?.id) return;
+    if (!sessionId || !userId) return;
 
     socket.connect();
     socket.emit("session:join", {
       sessionId,
       user: {
-        id: user.id,
-        name: user.fullName || user.username || user.firstName || "Guest",
-        image: user.imageUrl || "",
+        id: userId,
+        name: userName,
+        image: userImage,
         socketId: socket.id,
       },
     });
@@ -27,22 +31,22 @@ export const useSessionSocket = (sessionId, user) => {
     socket.on("session:typing:update", handleTyping);
 
     return () => {
-      socket.emit("session:leave", { sessionId, userId: user.id });
+      socket.emit("session:leave", { sessionId, userId });
       socket.off("session:presence", handlePresence);
       socket.off("session:typing:update", handleTyping);
       disconnectSocket();
     };
-  }, [sessionId, user, socket]);
+  }, [sessionId, userId, userName, userImage, socket]);
 
-  const syncCode = (code, language) => {
-    if (!sessionId || !user?.id) return;
-    socket.emit("code:sync", { sessionId, code, language, userId: user.id });
-  };
+  const syncCode = useCallback((code, language) => {
+    if (!sessionId || !userId || typeof code !== "string") return;
+    socket.emit("code:sync", { sessionId, code, language, userId });
+  }, [sessionId, userId, socket]);
 
-  const setTyping = (isTyping) => {
-    if (!sessionId || !user?.id) return;
-    socket.emit("session:typing", { sessionId, userId: user.id, isTyping });
-  };
+  const setTyping = useCallback((isTyping) => {
+    if (!sessionId || !userId) return;
+    socket.emit("session:typing", { sessionId, userId, isTyping });
+  }, [sessionId, userId, socket]);
 
   return { socket, participants, typingUsers, syncCode, setTyping };
 };

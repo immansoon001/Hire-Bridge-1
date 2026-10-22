@@ -1,14 +1,15 @@
-import { clerkClient, requireAuth } from "@clerk/express";
+import { clerkClient, getAuth } from "@clerk/express";
 import User from "../models/User.js";
 import { upsertStreamUser } from "../lib/stream.js";
 
-export const protectRoute = [
-  requireAuth(),
-  async (req, res, next) => {
-    try {
-      const clerkId = req.auth().userId;
+export const protectRoute = async (req, res, next) => {
+  try {
+    const auth = getAuth(req);
+    const clerkId = auth?.userId;
 
-      if (!clerkId) return res.status(401).json({ message: "Unauthorized - invalid token" });
+    if (!clerkId) {
+      return res.status(401).json({ message: "Unauthorized - Please sign in to continue" });
+    }
 
       // find user in db by clerk ID
       let user = await User.findOne({ clerkId });
@@ -47,13 +48,12 @@ export const protectRoute = [
         console.log(`✅ Auto-synced user ${clerkId} to DB and Stream.`);
       }
 
-      // attach user to req
-      req.user = user;
+    // attach user to req
+    req.user = user;
 
-      next();
-    } catch (error) {
-      console.error("Error in protectRoute middleware", error);
-      res.status(500).json({ message: "Internal Server Error" });
-    }
-  },
-];
+    next();
+  } catch (error) {
+    console.error("Error in protectRoute middleware:", error);
+    res.status(500).json({ message: error.message || "Internal Server Error" });
+  }
+};

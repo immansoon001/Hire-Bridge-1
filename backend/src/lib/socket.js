@@ -4,6 +4,7 @@ const getRoomState = (sessionId) => {
   if (!roomState.has(sessionId)) {
     roomState.set(sessionId, {
       code: "",
+      language: "javascript",
       participants: new Map(),
       typingUsers: new Set(),
     });
@@ -27,6 +28,15 @@ export const initializeSocket = (io) => {
       io.to(sessionId).emit("session:presence", {
         participants: Array.from(state.participants.values()),
       });
+
+      // Send current live code & language to newly joined participant
+      if (state.code) {
+        socket.emit("code:sync", {
+          code: state.code,
+          language: state.language || "javascript",
+          userId: "server",
+        });
+      }
     });
 
     socket.on("session:typing", ({ sessionId, userId, isTyping }) => {
@@ -46,6 +56,7 @@ export const initializeSocket = (io) => {
 
       const state = getRoomState(sessionId);
       state.code = code;
+      if (language) state.language = language;
 
       socket.to(sessionId).emit("code:sync", {
         code,
@@ -70,15 +81,24 @@ export const initializeSocket = (io) => {
       io.to(sessionId).emit("session:presence", {
         participants: Array.from(state.participants.values()),
       });
+      io.to(sessionId).emit("session:typing:update", {
+        typingUsers: Array.from(state.typingUsers),
+      });
     });
 
     socket.on("disconnect", () => {
       for (const [sessionId, state] of roomState.entries()) {
         const removed = [...state.participants.entries()].filter(([, user]) => user.socketId === socket.id);
         if (removed.length > 0) {
-          removed.forEach(([userId]) => state.participants.delete(userId));
+          removed.forEach(([userId]) => {
+            state.participants.delete(userId);
+            state.typingUsers.delete(userId);
+          });
           io.to(sessionId).emit("session:presence", {
             participants: Array.from(state.participants.values()),
+          });
+          io.to(sessionId).emit("session:typing:update", {
+            typingUsers: Array.from(state.typingUsers),
           });
         }
       }
