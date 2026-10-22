@@ -11,6 +11,7 @@ function CodeEditorPanel({
   onLanguageChange,
   onCodeChange,
   onRunCode,
+  onMount,
   problemTitle = "",
 }) {
   const [showAiModal, setShowAiModal] = useState(false);
@@ -66,6 +67,7 @@ function CodeEditorPanel({
           language={LANGUAGE_CONFIG[selectedLanguage].monacoLang}
           value={code}
           onChange={(value) => onCodeChange(value ?? "")}
+          onMount={onMount}
           theme="vs-dark"
           options={{
             fontSize: 16,
@@ -73,6 +75,8 @@ function CodeEditorPanel({
             scrollBeyondLastLine: false,
             automaticLayout: true,
             minimap: { enabled: false },
+            readOnly: false,
+            domReadOnly: false,
           }}
         />
       </div>

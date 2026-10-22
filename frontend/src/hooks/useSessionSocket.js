@@ -34,13 +34,12 @@ export const useSessionSocket = (sessionId, user) => {
       socket.emit("session:leave", { sessionId, userId });
       socket.off("session:presence", handlePresence);
       socket.off("session:typing:update", handleTyping);
-      disconnectSocket();
     };
   }, [sessionId, userId, userName, userImage, socket]);
 
   const syncCode = useCallback((code, language) => {
     if (!sessionId || !userId || typeof code !== "string") return;
-    socket.emit("code:sync", { sessionId, code, language, userId });
+    socket.emit("code:sync", { sessionId, code, language, userId, socketId: socket.id });
   }, [sessionId, userId, socket]);
 
   const setTyping = useCallback((isTyping) => {

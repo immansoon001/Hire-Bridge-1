@@ -51,7 +51,7 @@ export const initializeSocket = (io) => {
       });
     });
 
-    socket.on("code:sync", ({ sessionId, code, language, userId }) => {
+    socket.on("code:sync", ({ sessionId, code, language, userId, socketId }) => {
       if (!sessionId || typeof code !== "string") return;
 
       const state = getRoomState(sessionId);
@@ -62,6 +62,7 @@ export const initializeSocket = (io) => {
         code,
         language,
         userId,
+        socketId: socketId || socket.id,
       });
     });
 
