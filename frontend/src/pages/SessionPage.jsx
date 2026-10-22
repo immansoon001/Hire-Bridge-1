@@ -100,9 +100,11 @@ function SessionPage() {
   const problemData = matchedProblem || fallbackProblem;
 
   const [selectedLanguage, setSelectedLanguage] = useState("javascript");
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(() => problemData?.starterCode?.[selectedLanguage] || "");
   const typingTimeoutRef = useRef(null);
   const isCodeInitializedRef = useRef(false);
+  const isRemoteUpdateRef = useRef(false);
+  const editorRef = useRef(null);
 
   const { socket, participants, typingUsers, syncCode, setTyping } = useSessionSocket(id, user);
 
@@ -133,6 +135,12 @@ function SessionPage() {
   }, [loadingSession, problemData, selectedLanguage]);
 
   const handleCodeChange = (newCode) => {
+    // If change was triggered by remote socket update, do not echo back
+    if (isRemoteUpdateRef.current) {
+      isRemoteUpdateRef.current = false;
+      return;
+    }
+
     isCodeInitializedRef.current = true;
     setCode(newCode);
     syncCode(newCode, selectedLanguage);
@@ -155,9 +163,18 @@ function SessionPage() {
   };
 
   useEffect(() => {
-    const handleIncomingCode = ({ code: nextCode, language, userId }) => {
-      if (typeof nextCode !== "string" || userId === user?.id) return;
+    const handleIncomingCode = ({ code: nextCode, language, userId, socketId }) => {
+      if (typeof nextCode !== "string") return;
 
+      // Ignore echoes from this exact socket connection
+      if (socketId && socket?.id && socketId === socket.id) return;
+
+      // If local editor already has this exact code, do not reset cursor/content
+      if (editorRef.current && editorRef.current.getValue() === nextCode) {
+        return;
+      }
+
+      isRemoteUpdateRef.current = true;
       isCodeInitializedRef.current = true;
 
       if (language) {
@@ -172,7 +189,7 @@ function SessionPage() {
     return () => {
       socket.off("code:sync", handleIncomingCode);
     };
-  }, [socket, user?.id]);
+  }, [socket]);
 
   const handleRunCode = async () => {
     setIsRunning(true);
@@ -355,6 +372,9 @@ function SessionPage() {
                       problemTitle={session?.problem || "Interview Session"}
                       onLanguageChange={handleLanguageChange}
                       onCodeChange={handleCodeChange}
+                      onMount={(editor) => {
+                        editorRef.current = editor;
+                      }}
                       onRunCode={handleRunCode}
                     />
                   </Panel>
