@@ -60,12 +60,12 @@ function CodeEditorPanel({
         </div>
       </div>
 
-      <div className="flex-1">
+      <div className="flex-1 min-h-0">
         <Editor
           height={"100%"}
           language={LANGUAGE_CONFIG[selectedLanguage].monacoLang}
           value={code}
-          onChange={onCodeChange}
+          onChange={(value) => onCodeChange(value ?? "")}
           theme="vs-dark"
           options={{
             fontSize: 16,

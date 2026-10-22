@@ -1,5 +1,5 @@
 import { useUser } from "@clerk/clerk-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useEndSession, useJoinSession, useSessionById } from "../hooks/useSessions";
 import { PROBLEMS } from "../data/problems";
@@ -55,13 +55,15 @@ function SessionPage() {
   );
 
   // find problem data based on session problem title or provide interview fallback
-  const matchedProblem = session?.problem
-    ? Object.values(PROBLEMS).find(
-        (p) => p.title.toLowerCase() === session.problem.toLowerCase()
-      )
-    : null;
+  const matchedProblem = useMemo(() => {
+    return session?.problem
+      ? Object.values(PROBLEMS).find(
+          (p) => p.title.toLowerCase() === session.problem.toLowerCase()
+        )
+      : null;
+  }, [session?.problem]);
 
-  const fallbackProblem = {
+  const fallbackProblem = useMemo(() => ({
     title: session?.problem || "Live Technical Interview",
     difficulty: session?.difficulty
       ? session.difficulty.charAt(0).toUpperCase() + session.difficulty.slice(1)
@@ -93,14 +95,14 @@ function SessionPage() {
       python: `# Technical Interview Workspace\n# Role / Topic: ${session?.problem || "Coding Assessment"}\n\ndef solution():\n    # Write your solution here\n    print("Hello from Hire-Bridge Interview Workspace!")\n\nif __name__ == "__main__":\n    solution()\n`,
       java: `// Technical Interview Workspace\n// Role / Topic: ${session?.problem || "Coding Assessment"}\n\npublic class Main {\n    public static void main(String[] args) {\n        // Write your solution here\n        System.out.println("Hello from Hire-Bridge Interview Workspace!");\n    }\n}\n`,
     },
-  };
+  }), [session?.problem, session?.difficulty]);
 
   const problemData = matchedProblem || fallbackProblem;
 
   const [selectedLanguage, setSelectedLanguage] = useState("javascript");
-  const [code, setCode] = useState(problemData?.starterCode?.[selectedLanguage] || "");
-  const [isRemoteUpdate, setIsRemoteUpdate] = useState(false);
+  const [code, setCode] = useState("");
   const typingTimeoutRef = useRef(null);
+  const isCodeInitializedRef = useRef(false);
 
   const { socket, participants, typingUsers, syncCode, setTyping } = useSessionSocket(id, user);
 
@@ -121,25 +123,30 @@ function SessionPage() {
     if (session.status === "completed") navigate("/dashboard");
   }, [session, loadingSession, navigate]);
 
-  // update code when problem loads or changes
+  // initialize starter code once session data is available, unless code was already set or received
   useEffect(() => {
-    if (problemData?.starterCode?.[selectedLanguage]) {
+    if (loadingSession) return;
+    if (!isCodeInitializedRef.current && problemData?.starterCode?.[selectedLanguage]) {
       setCode(problemData.starterCode[selectedLanguage]);
+      isCodeInitializedRef.current = true;
     }
-  }, [problemData, selectedLanguage]);
+  }, [loadingSession, problemData, selectedLanguage]);
 
-  useEffect(() => {
-    if (isRemoteUpdate) {
-      setIsRemoteUpdate(false);
-      return;
+  const handleCodeChange = (newCode) => {
+    isCodeInitializedRef.current = true;
+    setCode(newCode);
+    syncCode(newCode, selectedLanguage);
+    setTyping(true);
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
     }
-
-    syncCode(code, selectedLanguage);
-  }, [code, selectedLanguage]);
+    typingTimeoutRef.current = setTimeout(() => setTyping(false), 800);
+  };
 
   const handleLanguageChange = (e) => {
     const newLang = e.target.value;
     setSelectedLanguage(newLang);
+    isCodeInitializedRef.current = true;
     // use problem-specific starter code
     const starterCode = problemData?.starterCode?.[newLang] || "";
     setCode(starterCode);
@@ -149,13 +156,14 @@ function SessionPage() {
 
   useEffect(() => {
     const handleIncomingCode = ({ code: nextCode, language, userId }) => {
-      if (!nextCode || userId === user?.id) return;
+      if (typeof nextCode !== "string" || userId === user?.id) return;
 
-      if (language && language !== selectedLanguage) {
+      isCodeInitializedRef.current = true;
+
+      if (language) {
         setSelectedLanguage(language);
       }
 
-      setIsRemoteUpdate(true);
       setCode(nextCode);
     };
 
@@ -164,7 +172,7 @@ function SessionPage() {
     return () => {
       socket.off("code:sync", handleIncomingCode);
     };
-  }, [socket, selectedLanguage, user?.id]);
+  }, [socket, user?.id]);
 
   const handleRunCode = async () => {
     setIsRunning(true);
@@ -346,14 +354,7 @@ function SessionPage() {
                       isRunning={isRunning}
                       problemTitle={session?.problem || "Interview Session"}
                       onLanguageChange={handleLanguageChange}
-                      onCodeChange={(value) => {
-                        setCode(value);
-                        setTyping(true);
-                        if (typingTimeoutRef.current) {
-                          clearTimeout(typingTimeoutRef.current);
-                        }
-                        typingTimeoutRef.current = setTimeout(() => setTyping(false), 800);
-                      }}
+                      onCodeChange={handleCodeChange}
                       onRunCode={handleRunCode}
                     />
                   </Panel>
