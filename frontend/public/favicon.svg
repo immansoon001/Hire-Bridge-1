@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="faviconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5865F2" />
+      <stop offset="50%" stop-color="#7C3AED" />
+      <stop offset="100%" stop-color="#8B5CF6" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background rounded rectangle -->
+  <rect width="128" height="128" rx="28" fill="url(#faviconGradient)" />
+
+  <!-- Code symbol </> -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Left bracket < -->
+    <path d="M 45 45 L 27 64 L 45 83" />
+    <!-- Slash / -->
+    <path d="M 57 87 L 71 41" />
+    <!-- Right bracket > -->
+    <path d="M 83 45 L 101 64 L 83 83" />
+  </g>
+</svg>
